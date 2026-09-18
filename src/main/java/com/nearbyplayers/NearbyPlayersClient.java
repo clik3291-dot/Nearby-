@@ -1,480 +1,49 @@
 package com.nearbyplayers;
 
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
-
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.util.InputUtil;
-import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
-import org.lwjgl.glfw.GLFW;
-
-import java.util.Comparator;
-import java.util.List;
-
 public class NearbyPlayersClient implements ClientModInitializer {
-
-    private static final int[] RADII = {
-        16, 32, 48, 64, 96, 128
-    };
-
-    private static int radiusIndex = 3;
-
-    private static boolean hudEnabled = true;
-    private static boolean showDistance = true;
-    private static boolean showHealth = false;
-    private static boolean compact = false;
-
-    private static KeyBinding toggleKey;
-    private static KeyBinding settingsKey;
 
     @Override
     public void onInitializeClient() {
 
-        toggleKey = KeyBindingHelper.registerKeyBinding(
-            new KeyBinding(
-                "key.nearbyplayers.toggle",
-                InputUtil.Type.KEYSYM,
-                GLFW.GLFW_KEY_P,
-                "category.nearbyplayers"
-            )
-        );
+        System.out.println("[NearbyPlayers] MOD LOADED!");
 
-        settingsKey = KeyBindingHelper.registerKeyBinding(
-            new KeyBinding(
-                "key.nearbyplayers.settings",
-                InputUtil.Type.KEYSYM,
-                GLFW.GLFW_KEY_O,
-                "category.nearbyplayers"
-            )
-        );
-
-        /*
-         * HUD для Fabric 1.21.8
-         */
         HudElementRegistry.addLast(
-            Identifier.of("nearbyplayers", "nearby_players_hud"),
-            (context, tickCounter) -> {
-
-                MinecraftClient client =
-                    MinecraftClient.getInstance();
-
-                if (!hudEnabled) {
-                    return;
-                }
-
-                if (client.player == null) {
-                    return;
-                }
-
-                if (client.world == null) {
-                    return;
-                }
-
-                renderHud(context);
-            }
+            Identifier.of("nearbyplayers", "test_hud"),
+            NearbyPlayersClient::render
         );
-
-        /*
-         * Клавиши
-         */
-        ClientTickEvents.END_CLIENT_TICK.register(client -> {
-
-            while (toggleKey.wasPressed()) {
-                hudEnabled = !hudEnabled;
-            }
-
-            while (settingsKey.wasPressed()) {
-
-                if (client.currentScreen == null) {
-                    client.setScreen(new SettingsScreen());
-                }
-            }
-        });
     }
 
-    private static int getRadius() {
-        return RADII[radiusIndex];
-    }
-
-    private static void renderHud(DrawContext context) {
+    private static void render(
+        DrawContext context,
+        net.minecraft.client.render.RenderTickCounter tickCounter
+    ) {
 
         MinecraftClient client =
             MinecraftClient.getInstance();
 
-        if (client.player == null || client.world == null) {
-            return;
-        }
-
-        List<? extends PlayerEntity> players =
-            client.world.getPlayers()
-                .stream()
-                .filter(player -> player != client.player)
-                .filter(player ->
-                    player.squaredDistanceTo(client.player)
-                        <= getRadius() * getRadius()
-                )
-                .sorted(
-                    Comparator.comparingDouble(
-                        player ->
-                            player.squaredDistanceTo(
-                                client.player
-                            )
-                    )
-                )
-                .limit(12)
-                .toList();
-
-        int x = 10;
-        int y = 10;
-
-        int rowHeight =
-            compact ? 12 : 14;
-
-        /*
-         * Заголовок
-         */
         context.drawText(
             client.textRenderer,
-            Text.literal("NEARBY PLAYERS"),
-            x,
-            y,
+            Text.literal("NEARBY PLAYERS HUD TEST"),
+            10,
+            10,
             0xFFFFFF,
             true
         );
 
-        y += rowHeight;
-
-        /*
-         * Радиус
-         */
         context.drawText(
             client.textRenderer,
-            Text.literal(
-                "Radius: " + getRadius() + "m"
-            ),
-            x,
-            y,
-            0xAAAAAA,
+            Text.literal("MOD WORKING"),
+            10,
+            25,
+            0x00FF00,
             true
         );
-
-        y += rowHeight;
-
-        /*
-         * Если рядом никого нет
-         */
-        if (players.isEmpty()) {
-
-            context.drawText(
-                client.textRenderer,
-                Text.literal("No nearby players"),
-                x,
-                y,
-                0xFFFFFF,
-                true
-            );
-
-            return;
-        }
-
-        /*
-         * Список игроков
-         */
-        for (PlayerEntity player : players) {
-
-            int distance =
-                (int) Math.sqrt(
-                    player.squaredDistanceTo(
-                        client.player
-                    )
-                );
-
-            StringBuilder line =
-                new StringBuilder(
-                    player.getName().getString()
-                );
-
-            if (showDistance) {
-
-                line.append(" ")
-                    .append(distance)
-                    .append("m");
-            }
-
-            if (showHealth) {
-
-                line.append(" HP:")
-                    .append(
-                        Math.round(
-                            player.getHealth()
-                        )
-                    );
-            }
-
-            context.drawText(
-                client.textRenderer,
-                Text.literal(line.toString()),
-                x,
-                y,
-                0xFFFFFF,
-                true
-            );
-
-            y += rowHeight;
-        }
-    }
-
-    /*
-     * Окно настроек
-     */
-    private static class SettingsScreen
-        extends Screen {
-
-        protected SettingsScreen() {
-
-            super(
-                Text.literal(
-                    "Nearby Players Settings"
-                )
-            );
-        }
-
-        @Override
-        protected void init() {
-
-            int centerX =
-                this.width / 2;
-
-            int y =
-                this.height / 2 - 70;
-
-            /*
-             * Radius
-             */
-            addDrawableChild(
-                ButtonWidget.builder(
-                    Text.literal(
-                        "Radius: " +
-                        getRadius() +
-                        "m"
-                    ),
-                    button -> {
-
-                        radiusIndex =
-                            (radiusIndex + 1)
-                            % RADII.length;
-
-                        button.setMessage(
-                            Text.literal(
-                                "Radius: " +
-                                getRadius() +
-                                "m"
-                            )
-                        );
-                    }
-                ).dimensions(
-                    centerX - 100,
-                    y,
-                    200,
-                    20
-                ).build()
-            );
-
-            y += 26;
-
-            /*
-             * Distance
-             */
-            addDrawableChild(
-                ButtonWidget.builder(
-                    Text.literal(
-                        "Distance: " +
-                        (showDistance
-                            ? "ON"
-                            : "OFF")
-                    ),
-                    button -> {
-
-                        showDistance =
-                            !showDistance;
-
-                        button.setMessage(
-                            Text.literal(
-                                "Distance: " +
-                                (showDistance
-                                    ? "ON"
-                                    : "OFF")
-                            )
-                        );
-                    }
-                ).dimensions(
-                    centerX - 100,
-                    y,
-                    200,
-                    20
-                ).build()
-            );
-
-            y += 26;
-
-            /*
-             * Health
-             */
-            addDrawableChild(
-                ButtonWidget.builder(
-                    Text.literal(
-                        "Health: " +
-                        (showHealth
-                            ? "ON"
-                            : "OFF")
-                    ),
-                    button -> {
-
-                        showHealth =
-                            !showHealth;
-
-                        button.setMessage(
-                            Text.literal(
-                                "Health: " +
-                                (showHealth
-                                    ? "ON"
-                                    : "OFF")
-                            )
-                        );
-                    }
-                ).dimensions(
-                    centerX - 100,
-                    y,
-                    200,
-                    20
-                ).build()
-            );
-
-            y += 26;
-
-            /*
-             * Compact
-             */
-            addDrawableChild(
-                ButtonWidget.builder(
-                    Text.literal(
-                        "Compact: " +
-                        (compact
-                            ? "ON"
-                            : "OFF")
-                    ),
-                    button -> {
-
-                        compact =
-                            !compact;
-
-                        button.setMessage(
-                            Text.literal(
-                                "Compact: " +
-                                (compact
-                                    ? "ON"
-                                    : "OFF")
-                            )
-                        );
-                    }
-                ).dimensions(
-                    centerX - 100,
-                    y,
-                    200,
-                    20
-                ).build()
-            );
-
-            y += 32;
-
-            /*
-             * HUD ON/OFF
-             */
-            addDrawableChild(
-                ButtonWidget.builder(
-                    Text.literal(
-                        "HUD: " +
-                        (hudEnabled
-                            ? "ON"
-                            : "OFF")
-                    ),
-                    button -> {
-
-                        hudEnabled =
-                            !hudEnabled;
-
-                        button.setMessage(
-                            Text.literal(
-                                "HUD: " +
-                                (hudEnabled
-                                    ? "ON"
-                                    : "OFF")
-                            )
-                        );
-                    }
-                ).dimensions(
-                    centerX - 100,
-                    y,
-                    200,
-                    20
-                ).build()
-            );
-
-            y += 32;
-
-            /*
-             * Done
-             */
-            addDrawableChild(
-                ButtonWidget.builder(
-                    Text.literal("Done"),
-                    button ->
-                        MinecraftClient
-                            .getInstance()
-                            .setScreen(null)
-                ).dimensions(
-                    centerX - 100,
-                    y,
-                    200,
-                    20
-                ).build()
-            );
-        }
-
-        @Override
-        public void render(
-            DrawContext context,
-            int mouseX,
-            int mouseY,
-            float delta
-        ) {
-
-            MinecraftClient client =
-                MinecraftClient.getInstance();
-
-            context.drawCenteredTextWithShadow(
-                client.textRenderer,
-                this.title,
-                this.width / 2,
-                30,
-                0xFFFFFF
-            );
-
-            super.render(
-                context,
-                mouseX,
-                mouseY,
-                delta
-            );
-        }
     }
 }
