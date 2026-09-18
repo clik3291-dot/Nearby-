@@ -3,7 +3,7 @@ package com.nearbyplayers;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -14,6 +14,7 @@ import net.minecraft.client.util.InputUtil;
 
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -57,8 +58,9 @@ public class NearbyPlayersClient implements ClientModInitializer {
             )
         );
 
-        HudRenderCallback.EVENT.register(
-            (context, tickDelta) -> renderHud(context)
+        HudElementRegistry.addLast(
+            Identifier.of("nearbyplayers", "nearby_players_hud"),
+            (context, tickCounter) -> renderHud(context)
         );
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -68,7 +70,6 @@ public class NearbyPlayersClient implements ClientModInitializer {
             }
 
             while (settingsKey.wasPressed()) {
-
                 if (client.currentScreen == null) {
                     client.setScreen(new SettingsScreen());
                 }
@@ -89,13 +90,42 @@ public class NearbyPlayersClient implements ClientModInitializer {
         if (client.player == null) return;
         if (client.world == null) return;
 
+        int x = 8;
+        int y = 8;
+
+        int rowHeight = compact ? 12 : 14;
+
+        context.drawText(
+            client.textRenderer,
+            Text.literal("NEARBY PLAYERS"),
+            x,
+            y,
+            0x55FFFF,
+            true
+        );
+
+        y += rowHeight + 2;
+
+        context.drawText(
+            client.textRenderer,
+            Text.literal(
+                "Radius: " + getRadius() + "m"
+            ),
+            x,
+            y,
+            0xFFFFFF,
+            true
+        );
+
+        y += rowHeight + 2;
+
         List<? extends PlayerEntity> players =
             client.world.getPlayers()
                 .stream()
                 .filter(player -> player != client.player)
                 .filter(player ->
                     player.squaredDistanceTo(client.player)
-                        <= getRadius() * getRadius()
+                        <= (double) getRadius() * getRadius()
                 )
                 .sorted(
                     Comparator.comparingDouble(
@@ -108,26 +138,19 @@ public class NearbyPlayersClient implements ClientModInitializer {
                 .limit(12)
                 .toList();
 
-        int x = 8;
-        int y = 8;
+        if (players.isEmpty()) {
 
-        int rowHeight =
-            compact ? 12 : 14;
+            context.drawText(
+                client.textRenderer,
+                Text.literal("No nearby players"),
+                x,
+                y,
+                0xAAAAAA,
+                true
+            );
 
-        context.drawText(
-            client.textRenderer,
-            Text.literal(
-                "Nearby Players (" +
-                getRadius() +
-                "m)"
-            ),
-            x,
-            y,
-            0xFFFFFF,
-            true
-        );
-
-        y += rowHeight;
+            return;
+        }
 
         for (PlayerEntity player : players) {
 
@@ -185,11 +208,8 @@ public class NearbyPlayersClient implements ClientModInitializer {
         @Override
         protected void init() {
 
-            int centerX =
-                this.width / 2;
-
-            int y =
-                this.height / 2 - 70;
+            int centerX = this.width / 2;
+            int y = this.height / 2 - 70;
 
             addDrawableChild(
                 ButtonWidget.builder(
@@ -361,4 +381,4 @@ public class NearbyPlayersClient implements ClientModInitializer {
             );
         }
     }
-                }
+}
