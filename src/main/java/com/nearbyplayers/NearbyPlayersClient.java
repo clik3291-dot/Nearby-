@@ -369,7 +369,3 @@ public class NearbyPlayersClient implements ClientModInitializer {
         }
     }
 }
-
-После этого Commit changes → Actions → Run workflow.
-
-Теперь предыдущая ошибка "List<AbstractClientPlayerEntity>" должна исчезнуть.
