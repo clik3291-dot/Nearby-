@@ -11,7 +11,6 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
-
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -58,11 +57,35 @@ public class NearbyPlayersClient implements ClientModInitializer {
             )
         );
 
+        /*
+         * HUD для Fabric 1.21.8
+         */
         HudElementRegistry.addLast(
             Identifier.of("nearbyplayers", "nearby_players_hud"),
-            (context, tickCounter) -> renderHud(context)
+            (context, tickCounter) -> {
+
+                MinecraftClient client =
+                    MinecraftClient.getInstance();
+
+                if (!hudEnabled) {
+                    return;
+                }
+
+                if (client.player == null) {
+                    return;
+                }
+
+                if (client.world == null) {
+                    return;
+                }
+
+                renderHud(context);
+            }
         );
 
+        /*
+         * Клавиши
+         */
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
 
             while (toggleKey.wasPressed()) {
@@ -70,6 +93,7 @@ public class NearbyPlayersClient implements ClientModInitializer {
             }
 
             while (settingsKey.wasPressed()) {
+
                 if (client.currentScreen == null) {
                     client.setScreen(new SettingsScreen());
                 }
@@ -86,38 +110,9 @@ public class NearbyPlayersClient implements ClientModInitializer {
         MinecraftClient client =
             MinecraftClient.getInstance();
 
-        if (!hudEnabled) return;
-        if (client.player == null) return;
-        if (client.world == null) return;
-
-        int x = 8;
-        int y = 8;
-
-        int rowHeight = compact ? 12 : 14;
-
-        context.drawText(
-            client.textRenderer,
-            Text.literal("NEARBY PLAYERS"),
-            x,
-            y,
-            0x55FFFF,
-            true
-        );
-
-        y += rowHeight + 2;
-
-        context.drawText(
-            client.textRenderer,
-            Text.literal(
-                "Radius: " + getRadius() + "m"
-            ),
-            x,
-            y,
-            0xFFFFFF,
-            true
-        );
-
-        y += rowHeight + 2;
+        if (client.player == null || client.world == null) {
+            return;
+        }
 
         List<? extends PlayerEntity> players =
             client.world.getPlayers()
@@ -125,7 +120,7 @@ public class NearbyPlayersClient implements ClientModInitializer {
                 .filter(player -> player != client.player)
                 .filter(player ->
                     player.squaredDistanceTo(client.player)
-                        <= (double) getRadius() * getRadius()
+                        <= getRadius() * getRadius()
                 )
                 .sorted(
                     Comparator.comparingDouble(
@@ -138,6 +133,45 @@ public class NearbyPlayersClient implements ClientModInitializer {
                 .limit(12)
                 .toList();
 
+        int x = 10;
+        int y = 10;
+
+        int rowHeight =
+            compact ? 12 : 14;
+
+        /*
+         * Заголовок
+         */
+        context.drawText(
+            client.textRenderer,
+            Text.literal("NEARBY PLAYERS"),
+            x,
+            y,
+            0xFFFFFF,
+            true
+        );
+
+        y += rowHeight;
+
+        /*
+         * Радиус
+         */
+        context.drawText(
+            client.textRenderer,
+            Text.literal(
+                "Radius: " + getRadius() + "m"
+            ),
+            x,
+            y,
+            0xAAAAAA,
+            true
+        );
+
+        y += rowHeight;
+
+        /*
+         * Если рядом никого нет
+         */
         if (players.isEmpty()) {
 
             context.drawText(
@@ -145,13 +179,16 @@ public class NearbyPlayersClient implements ClientModInitializer {
                 Text.literal("No nearby players"),
                 x,
                 y,
-                0xAAAAAA,
+                0xFFFFFF,
                 true
             );
 
             return;
         }
 
+        /*
+         * Список игроков
+         */
         for (PlayerEntity player : players) {
 
             int distance =
@@ -167,12 +204,14 @@ public class NearbyPlayersClient implements ClientModInitializer {
                 );
 
             if (showDistance) {
+
                 line.append(" ")
                     .append(distance)
                     .append("m");
             }
 
             if (showHealth) {
+
                 line.append(" HP:")
                     .append(
                         Math.round(
@@ -194,10 +233,14 @@ public class NearbyPlayersClient implements ClientModInitializer {
         }
     }
 
+    /*
+     * Окно настроек
+     */
     private static class SettingsScreen
         extends Screen {
 
         protected SettingsScreen() {
+
             super(
                 Text.literal(
                     "Nearby Players Settings"
@@ -208,9 +251,15 @@ public class NearbyPlayersClient implements ClientModInitializer {
         @Override
         protected void init() {
 
-            int centerX = this.width / 2;
-            int y = this.height / 2 - 70;
+            int centerX =
+                this.width / 2;
 
+            int y =
+                this.height / 2 - 70;
+
+            /*
+             * Radius
+             */
             addDrawableChild(
                 ButtonWidget.builder(
                     Text.literal(
@@ -242,6 +291,9 @@ public class NearbyPlayersClient implements ClientModInitializer {
 
             y += 26;
 
+            /*
+             * Distance
+             */
             addDrawableChild(
                 ButtonWidget.builder(
                     Text.literal(
@@ -274,6 +326,9 @@ public class NearbyPlayersClient implements ClientModInitializer {
 
             y += 26;
 
+            /*
+             * Health
+             */
             addDrawableChild(
                 ButtonWidget.builder(
                     Text.literal(
@@ -306,6 +361,9 @@ public class NearbyPlayersClient implements ClientModInitializer {
 
             y += 26;
 
+            /*
+             * Compact
+             */
             addDrawableChild(
                 ButtonWidget.builder(
                     Text.literal(
@@ -338,6 +396,44 @@ public class NearbyPlayersClient implements ClientModInitializer {
 
             y += 32;
 
+            /*
+             * HUD ON/OFF
+             */
+            addDrawableChild(
+                ButtonWidget.builder(
+                    Text.literal(
+                        "HUD: " +
+                        (hudEnabled
+                            ? "ON"
+                            : "OFF")
+                    ),
+                    button -> {
+
+                        hudEnabled =
+                            !hudEnabled;
+
+                        button.setMessage(
+                            Text.literal(
+                                "HUD: " +
+                                (hudEnabled
+                                    ? "ON"
+                                    : "OFF")
+                            )
+                        );
+                    }
+                ).dimensions(
+                    centerX - 100,
+                    y,
+                    200,
+                    20
+                ).build()
+            );
+
+            y += 32;
+
+            /*
+             * Done
+             */
             addDrawableChild(
                 ButtonWidget.builder(
                     Text.literal("Done"),
