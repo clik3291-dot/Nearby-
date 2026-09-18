@@ -1,0 +1,293 @@
+name: Build Nearby Players Fabric 1.21.8
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create project
+        shell: bash
+        run: |
+          mkdir -p src/main/java/com/nearbyplayers
+          mkdir -p src/main/resources
+
+          cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  maven { url = "https://maven.fabricmc.net/" }
+                  gradlePluginPortal()
+                  mavenCentral()
+              }
+          }
+
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+              repositories {
+                  maven { url = "https://maven.fabricmc.net/" }
+                  mavenCentral()
+              }
+          }
+
+          rootProject.name = "NearbyPlayers"
+          EOF
+
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2G
+          minecraft_version=1.21.8
+          yarn_mappings=1.21.8+build.1
+          loader_version=0.16.14
+          fabric_version=0.136.1+1.21.8
+          mod_version=1.1.0
+          maven_group=com.nearbyplayers
+          archives_base_name=nearby-players-pojav
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins {
+              id 'fabric-loom' version '1.10.8'
+              id 'maven-publish'
+          }
+
+          version = project.mod_version
+          group = project.maven_group
+
+          repositories {
+              maven { url = "https://maven.fabricmc.net/" }
+              mavenCentral()
+          }
+
+          dependencies {
+              minecraft "com.mojang:minecraft:${project.minecraft_version}"
+              mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+              modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+              modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+          }
+
+          processResources {
+              inputs.property "version", project.version
+              filesMatching("fabric.mod.json") {
+                  expand "version": project.version
+              }
+          }
+
+          tasks.withType(JavaCompile).configureEach {
+              options.release = 21
+          }
+
+          java {
+              withSourcesJar()
+              sourceCompatibility = JavaVersion.VERSION_21
+              targetCompatibility = JavaVersion.VERSION_21
+          }
+          EOF
+
+          cat > src/main/resources/fabric.mod.json <<'EOF'
+          {
+            "schemaVersion": 1,
+            "id": "nearbyplayers",
+            "version": "${version}",
+            "name": "Nearby Players",
+            "description": "Client-side nearby players HUD for Fabric 1.21.8",
+            "authors": ["NearbyPlayers"],
+            "environment": "client",
+            "entrypoints": {
+              "client": ["com.nearbyplayers.NearbyPlayersClient"]
+            },
+            "depends": {
+              "fabricloader": ">=0.16.14",
+              "minecraft": "~1.21.8",
+              "fabric-api": "*"
+            }
+          }
+          EOF
+
+          cat > src/main/java/com/nearbyplayers/NearbyPlayersClient.java <<'EOF'
+          package com.nearbyplayers;
+
+          import net.fabricmc.api.ClientModInitializer;
+          import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+          import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+          import net.minecraft.client.MinecraftClient;
+          import net.minecraft.client.gui.DrawContext;
+          import net.minecraft.client.option.KeyBinding;
+          import net.minecraft.client.util.InputUtil;
+          import net.minecraft.entity.player.PlayerEntity;
+          import net.minecraft.text.Text;
+          import org.lwjgl.glfw.GLFW;
+
+          import java.util.Comparator;
+          import java.util.List;
+
+          public class NearbyPlayersClient implements ClientModInitializer {
+              private static final int[] RADII = {16, 32, 48, 64, 96, 128};
+              private static int radiusIndex = 3;
+              private static boolean hudEnabled = true;
+              private static boolean showDistance = true;
+              private static boolean showHealth = false;
+              private static boolean compact = false;
+
+              private static KeyBinding toggleKey;
+              private static KeyBinding settingsKey;
+
+              @Override
+              public void onInitializeClient() {
+                  toggleKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                      "key.nearbyplayers.toggle",
+                      InputUtil.Type.KEYSYM,
+                      GLFW.GLFW_KEY_P,
+                      "category.nearbyplayers"
+                  ));
+
+                  settingsKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                      "key.nearbyplayers.settings",
+                      InputUtil.Type.KEYSYM,
+                      GLFW.GLFW_KEY_O,
+                      "category.nearbyplayers"
+                  ));
+
+                  ClientTickEvents.END_CLIENT_TICK.register(client -> {
+                      while (toggleKey.wasPressed()) hudEnabled = !hudEnabled;
+                      while (settingsKey.wasPressed()) {
+                          if (client.currentScreen == null) {
+                              client.setScreen(new SettingsScreen(client));
+                          }
+                      }
+                  });
+              }
+
+              public static int radius() { return RADII[radiusIndex]; }
+              public static boolean hudEnabled() { return hudEnabled; }
+              public static boolean showDistance() { return showDistance; }
+              public static boolean showHealth() { return showHealth; }
+              public static boolean compact() { return compact; }
+
+              public static void cycleRadius() {
+                  radiusIndex = (radiusIndex + 1) % RADII.length;
+              }
+
+              public static void toggleDistance() { showDistance = !showDistance; }
+              public static void toggleHealth() { showHealth = !showHealth; }
+              public static void toggleCompact() { compact = !compact; }
+
+              public static void render(DrawContext context, float tickDelta) {
+                  MinecraftClient client = MinecraftClient.getInstance();
+                  if (!hudEnabled || client.player == null || client.world == null) return;
+
+                  List<PlayerEntity> players = client.world.getPlayers().stream()
+                      .filter(p -> p != client.player)
+                      .filter(p -> p.squaredDistanceTo(client.player) <= radius() * radius())
+                      .sorted(Comparator.comparingDouble(p -> p.squaredDistanceTo(client.player)))
+                      .limit(12)
+                      .toList();
+
+                  int x = 8;
+                  int y = 8;
+                  int row = compact ? 12 : 14;
+
+                  context.drawText(client.textRenderer,
+                      Text.literal("Nearby Players (" + radius() + "m)"),
+                      x, y, 0xFFFFFF, true);
+                  y += row;
+
+                  for (PlayerEntity p : players) {
+                      int distance = (int)Math.sqrt(p.squaredDistanceTo(client.player));
+                      StringBuilder line = new StringBuilder(p.getName().getString());
+
+                      if (showDistance) line.append(" ").append(distance).append("m");
+                      if (showHealth) line.append(" HP:").append(Math.round(p.getHealth()));
+
+                      context.drawText(client.textRenderer,
+                          Text.literal(line.toString()),
+                          x, y, 0xFFFFFF, true);
+                      y += row;
+                  }
+              }
+
+              public static class SettingsScreen extends net.minecraft.client.gui.screen.Screen {
+                  private final MinecraftClient client;
+
+                  public SettingsScreen(MinecraftClient client) {
+                      super(Text.literal("Nearby Players Settings"));
+                      this.client = client;
+                  }
+
+                  @Override
+                  protected void init() {
+                      int w = this.width;
+                      int y = this.height / 2 - 70;
+
+                      this.addDrawableChild(net.minecraft.client.gui.widget.ButtonWidget.builder(
+                          Text.literal("Radius: " + radius() + "m"),
+                          b -> { cycleRadius(); b.setMessage(Text.literal("Radius: " + radius() + "m")); }
+                      ).dimensions(w/2-100, y, 200, 20).build());
+
+                      y += 26;
+                      this.addDrawableChild(net.minecraft.client.gui.widget.ButtonWidget.builder(
+                          Text.literal("Distance: " + (showDistance ? "ON" : "OFF")),
+                          b -> { toggleDistance(); b.setMessage(Text.literal("Distance: " + (showDistance ? "ON" : "OFF"))); }
+                      ).dimensions(w/2-100, y, 200, 20).build());
+
+                      y += 26;
+                      this.addDrawableChild(net.minecraft.client.gui.widget.ButtonWidget.builder(
+                          Text.literal("Health: " + (showHealth ? "ON" : "OFF")),
+                          b -> { toggleHealth(); b.setMessage(Text.literal("Health: " + (showHealth ? "ON" : "OFF"))); }
+                      ).dimensions(w/2-100, y, 200, 20).build());
+
+                      y += 26;
+                      this.addDrawableChild(net.minecraft.client.gui.widget.ButtonWidget.builder(
+                          Text.literal("Compact: " + (compact ? "ON" : "OFF")),
+                          b -> { toggleCompact(); b.setMessage(Text.literal("Compact: " + (compact ? "ON" : "OFF"))); }
+                      ).dimensions(w/2-100, y, 200, 20).build());
+
+                      y += 32;
+                      this.addDrawableChild(net.minecraft.client.gui.widget.ButtonWidget.builder(
+                          Text.literal("Done"),
+                          b -> client.setScreen(null)
+                      ).dimensions(w/2-100, y, 200, 20).build());
+                  }
+
+                  @Override
+                  public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+                      this.renderBackground(context, mouseX, mouseY, delta);
+                      context.drawCenteredTextWithShadow(client.textRenderer, this.title,
+                          this.width / 2, 30, 0xFFFFFF);
+                      super.render(context, mouseX, mouseY, delta);
+                  }
+              }
+          }
+          EOF
+
+          # Create a tiny client entrypoint mixin-free HUD hook using Fabric's HudRenderCallback.
+          python3 - <<'PY'
+          p="src/main/java/com/nearbyplayers/NearbyPlayersClient.java"
+          s=open(p).read()
+          s=s.replace(
+              'ClientTickEvents.END_CLIENT_TICK.register(client -> {',
+              'net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback.EVENT.register((context, tickDelta) -> render(context, tickDelta));\\n\\n                  ClientTickEvents.END_CLIENT_TICK.register(client -> {'
+          )
+          open(p,"w").write(s)
+          PY
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14"
+
+      - name: Build
+        run: gradle build --no-daemon
+
+      - name: Upload ready JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: NearbyPlayers-Fabric-1.21.8
+          path: build/libs/*.jar
+          if-no-files-found: error
