@@ -70,9 +70,7 @@ public class NearbyPlayersClient implements ClientModInitializer {
             while (settingsKey.wasPressed()) {
 
                 if (client.currentScreen == null) {
-                    client.setScreen(
-                        new SettingsScreen()
-                    );
+                    client.setScreen(new SettingsScreen());
                 }
             }
         });
@@ -91,23 +89,14 @@ public class NearbyPlayersClient implements ClientModInitializer {
         if (client.player == null) return;
         if (client.world == null) return;
 
-        List<PlayerEntity> players =
+        List<? extends PlayerEntity> players =
             client.world.getPlayers()
                 .stream()
-
-                .filter(
-                    player ->
-                        player != client.player
-                )
-
-                .filter(
-                    player ->
-                        player.squaredDistanceTo(
-                            client.player
-                        )
+                .filter(player -> player != client.player)
+                .filter(player ->
+                    player.squaredDistanceTo(client.player)
                         <= getRadius() * getRadius()
                 )
-
                 .sorted(
                     Comparator.comparingDouble(
                         player ->
@@ -116,9 +105,7 @@ public class NearbyPlayersClient implements ClientModInitializer {
                             )
                     )
                 )
-
                 .limit(12)
-
                 .toList();
 
         int x = 8;
@@ -157,14 +144,12 @@ public class NearbyPlayersClient implements ClientModInitializer {
                 );
 
             if (showDistance) {
-
                 line.append(" ")
                     .append(distance)
                     .append("m");
             }
 
             if (showHealth) {
-
                 line.append(" HP:")
                     .append(
                         Math.round(
@@ -175,9 +160,7 @@ public class NearbyPlayersClient implements ClientModInitializer {
 
             context.drawText(
                 client.textRenderer,
-                Text.literal(
-                    line.toString()
-                ),
+                Text.literal(line.toString()),
                 x,
                 y,
                 0xFFFFFF,
@@ -192,7 +175,6 @@ public class NearbyPlayersClient implements ClientModInitializer {
         extends Screen {
 
         protected SettingsScreen() {
-
             super(
                 Text.literal(
                     "Nearby Players Settings"
@@ -211,13 +193,11 @@ public class NearbyPlayersClient implements ClientModInitializer {
 
             addDrawableChild(
                 ButtonWidget.builder(
-
                     Text.literal(
                         "Radius: " +
                         getRadius() +
                         "m"
                     ),
-
                     button -> {
 
                         radiusIndex =
@@ -232,7 +212,6 @@ public class NearbyPlayersClient implements ClientModInitializer {
                             )
                         );
                     }
-
                 ).dimensions(
                     centerX - 100,
                     y,
@@ -245,14 +224,12 @@ public class NearbyPlayersClient implements ClientModInitializer {
 
             addDrawableChild(
                 ButtonWidget.builder(
-
                     Text.literal(
                         "Distance: " +
                         (showDistance
                             ? "ON"
                             : "OFF")
                     ),
-
                     button -> {
 
                         showDistance =
@@ -267,7 +244,6 @@ public class NearbyPlayersClient implements ClientModInitializer {
                             )
                         );
                     }
-
                 ).dimensions(
                     centerX - 100,
                     y,
@@ -280,14 +256,12 @@ public class NearbyPlayersClient implements ClientModInitializer {
 
             addDrawableChild(
                 ButtonWidget.builder(
-
                     Text.literal(
                         "Health: " +
                         (showHealth
                             ? "ON"
                             : "OFF")
                     ),
-
                     button -> {
 
                         showHealth =
@@ -302,7 +276,6 @@ public class NearbyPlayersClient implements ClientModInitializer {
                             )
                         );
                     }
-
                 ).dimensions(
                     centerX - 100,
                     y,
@@ -315,14 +288,12 @@ public class NearbyPlayersClient implements ClientModInitializer {
 
             addDrawableChild(
                 ButtonWidget.builder(
-
                     Text.literal(
                         "Compact: " +
                         (compact
                             ? "ON"
                             : "OFF")
                     ),
-
                     button -> {
 
                         compact =
@@ -337,7 +308,6 @@ public class NearbyPlayersClient implements ClientModInitializer {
                             )
                         );
                     }
-
                 ).dimensions(
                     centerX - 100,
                     y,
@@ -350,14 +320,11 @@ public class NearbyPlayersClient implements ClientModInitializer {
 
             addDrawableChild(
                 ButtonWidget.builder(
-
                     Text.literal("Done"),
-
                     button ->
                         MinecraftClient
                             .getInstance()
                             .setScreen(null)
-
                 ).dimensions(
                     centerX - 100,
                     y,
@@ -401,4 +368,8 @@ public class NearbyPlayersClient implements ClientModInitializer {
             );
         }
     }
-          }
+}
+
+После этого Commit changes → Actions → Run workflow.
+
+Теперь предыдущая ошибка "List<AbstractClientPlayerEntity>" должна исчезнуть.
