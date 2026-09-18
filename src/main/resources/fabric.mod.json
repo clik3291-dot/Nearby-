@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "nearbyplayers",
+  "version": "${version}",
+  "name": "Nearby Players",
+  "description": "Nearby players HUD for Fabric 1.21.8",
+  "authors": [
+    "NearbyPlayers"
+  ],
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.nearbyplayers.NearbyPlayersClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.14",
+    "minecraft": "1.21.8",
+    "fabric-api": "*"
+  }
+}
